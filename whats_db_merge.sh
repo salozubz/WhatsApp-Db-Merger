@@ -308,6 +308,13 @@ sqlite3 "$output_copy" "delete from props where key='fts_index_start';" "update 
 
 
 
+#duplicates
+sqlite3 "$output_copy" "with freqs as (select row_number() over (partition by jid order by message_count desc) as rn, jid as j_id,message_count as m_count from frequents) delete from frequents where jid in (select j_id from freqs where rn>1);" "with freq as (select row_number() over (partition by jid_row_id order by message_count desc) as rn, jid_row_id as j_id,message_count as m_count from frequent) delete from frequent where jid_row_id in (select j_id from freq where rn>1);"
+
+sqlite3 "$output_copy" "update message set sort_id=_id;"
+
+
+
 echo "restoring triggers"
 #restore triggers
 
@@ -327,7 +334,6 @@ for t in "${map_indices[@]}"; do
   sqlite3 "$output_copy" "drop index if exists $t;"
  fi
 done
-sqlite3 "$output_copy" "update message set sort_id=_id;"
 
 output_copy="${homeDir77}/output/msgstore_copy.db"
 output="${homeDir77}/output/msgstore.db"
@@ -335,8 +341,6 @@ output="${homeDir77}/output/msgstore.db"
 rm "$output"
 mv "$output_copy" "$output"
 
-#duplicates
-sqlite3 "$output" "with freqs as (select row_number() over (partition by jid order by message_count desc) as rn, jid as j_id,message_count as m_count from frequents) delete from frequents where jid in (select j_id from freqs where rn>1);" "with freq as (select row_number() over (partition by jid_row_id order by message_count desc) as rn, jid_row_id as j_id,message_count as m_count from frequent) delete from frequent where jid_row_id in (select j_id from freq where rn>1);"
 
 
 #backup_changes
