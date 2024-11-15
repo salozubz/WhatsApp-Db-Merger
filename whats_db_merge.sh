@@ -159,7 +159,7 @@ function CheckCommonCols() {
   for ((i=0;i<${#column_list[@]};i++)); do
    if [[ "${column_list[i]}" == *"jid_row_id"* || "${column_list[i]}" == "business_owner_jid" || "${columns[i]}" == "seller_jid" || "${columns[i]}" == *"lid_row_id"* ]]; then
     column_list_select[i]="j${i}.new_id"
-     if [[ "${column_list[i]}" == *"sender"* || (("${column_list[i]}" == *"group_jid_row_id"* || "${column_list[i]}" == *"call_creator"* ) && "$2" == "call_log") ]]; then
+     if [[ "${column_list[i]}" == *"sender"* || "${column_list[i]}" == *"account"* || (("${column_list[i]}" == *"group_jid_row_id"* || "${column_list[i]}" == *"call_creator"* ) && "$2" == "call_log") ]]; then
       column_list_str+=("left join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
      else
       column_list_str+=("join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
