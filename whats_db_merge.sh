@@ -63,12 +63,12 @@ echo "clearing triggers"
 declare -A triggers
 
 
-while read -r line; do
- trigger_name="${line%|*}"
- trigger_sql="${line#*|}"
- triggers["$trigger_name"]="$trigger_sql"
- sqlite3 "$output" "drop trigger ${trigger_name};"
-done<<<$(sqlite3 "$output" "select name,sql from sqlite_master where type='trigger';")
+while IFS='|' read -r trigger_name trigger_sql; do
+    # Escape any problematic characters in the trigger name
+    trigger_name="${trigger_name//[^a-zA-Z0-9_]/_}"
+    triggers[$trigger_name]="$trigger_sql"
+    sqlite3 "$output" "drop trigger \"${trigger_name}\";"
+done < <(sqlite3 "$output" "select name,sql from sqlite_master where type='trigger';")
 
 
 echo "clearing tables"
