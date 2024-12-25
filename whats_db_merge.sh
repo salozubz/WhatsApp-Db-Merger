@@ -4,26 +4,30 @@ dbs=("path_to_db1" "path_to_db2")
 
 #we need to use the latest database as the schema for the merged database. To get the latest database we have to find the one with the newest timestamp. This method can be overridden by directly assigning the database you desire as the base_db variable
 
-declare -A db_time
-
-for db in "${dbs[@]}"; do
+db_time=$(for db in "${dbs[@]}"; do
  t_stamp=$(sqlite3 "$db" "select timestamp from message where _id is not null order by _id desc limit 1;" 2> /dev/null)
-
- if [[ $? == 0 ]]; then
-  db_time["$db"]="$t_stamp"
- else
+ echo "${t_stamp} ${db}"
+ if [[ $? != 0 ]]; then
   echo "Please Check db ${db} as it looks invalid or non-existent"
   exit 1
  fi
-done
+done | sort -nr)
 
+base_db=$(printf "%s\n" "${db_time}" | head -n1 | cut -d ' ' -f2-)
 
-base_db=$(for db in "${!db_time[@]}"; do
- echo "${db_time[$db]} $db"
-done | sort -nr | head -n 1 | cut -d ' ' -f2)
+dbs=()
+
+#remove base database and get the other databases after removing the timestamps from each line
+
+while IFS= read -r line; do
+ ldb=$(echo "$line" | cut -d ' ' -f2-)
+ dbs+=("$ldb")
+done < <(printf "%s\n" "${db_time}" | sed '1d')
+
 
 
 echo -e "latest database is ${base_db}\nThis will be used as the Base database."
+
 
 #create copy of the latest database. this makes sure the original databases aren't altered and the copy will be the one edited
 
@@ -60,16 +64,14 @@ cp "$base_db" "$output"
 sqlite3 "$output" "vacuum;"
 
 echo "clearing triggers"
-declare -A triggers
 
+#backup
+triggers=$(sqlite3 "$output" "select sql from sqlite_master where type='trigger';")
 
-while read -r line; do
- trigger_name="${line%|*}"
- trigger_sql="${line#*|}"
- triggers["$trigger_name"]="$trigger_sql"
- sqlite3 "$output" "drop trigger ${trigger_name};"
-done<<<$(sqlite3 "$output" "select name,sql from sqlite_master where type='trigger';")
-
+#delete
+sqlite3 "$output" "select name from sqlite_master where type='trigger';" | while IFS= read -r trigger; do
+ sqlite3 "$output" "drop trigger if exists ${trigger};"
+done
 
 echo "clearing tables"
 IFS=$'\n' read -rd '' -a base_tables <<< $(sqlite3 "$output" "select name from sqlite_master where type='table' and name not like '%fts%' and name not like '%view%';")
@@ -318,9 +320,16 @@ sqlite3 "$output_copy" "update message set sort_id=_id;"
 echo "restoring triggers"
 #restore triggers
 
-for trigger in "${triggers[@]}"; do
- sqlite3 "$output_copy" "$trigger"
+printf "%s\n" "$triggers" | while IFS= read -r trigger_sql; do
+ sqlite3 "$output_copy" "$trigger_sql"
 done
+
+#for trigger in "${triggers[@]}"; do
+ #sqlite3 "$output_copy" "$trigger"
+#done
+
+
+
 
 echo "removing temp tables and indices"
 #delete map tables and temp indices
