@@ -295,10 +295,9 @@ done
 echo "fixing chats"
 
 #fixing display ids in chat
-chat_update_string=$(sqlite3 "$db" "select group_concat(name || '=maxid') from pragma_table_info('chat') where (name like '%message_row_id%' or name like '%message_sort_id%') and name not like '%ephemeral%';")
+chat_update_string=$(sqlite3 "$db" "select group_concat(name || '= (select maxid from display_ids where display_ids.chatid = chat._id)') from pragma_table_info('chat') where (name like '%message_row_id%' or name like '%message_sort_id%') and name not like '%ephemeral%';")
 
-
-sqlite3 "$output_copy" "with display_ids as (select max(_id) as maxid,chat_row_id as chatid from message where message_type not in (0,7) or (message_type=0 and text_data is not null) group by chat_row_id) update chat set ${chat_update_string} from display_ids where chat._id=display_ids.chatid;"
+sqlite3 "$output_copy" "with display_ids as (select max(_id) as maxid,chat_row_id as chatid from message where message_type not in (0,7) or (message_type=0 and text_data is not null) group by chat_row_id) update chat set ${chat_update_string} where exists (select 1 from display_ids where display_ids.chatid = chat._id);"
 
 
 sqlite3 "$output_copy" "update chat set hidden=case when exists (select 1 from message where chat_row_id = chat._id and message_type != 7) then 0 else 1 end;" "update chat set last_message_reaction_row_id=null,last_seen_message_reaction_row_id=null;"
@@ -323,12 +322,6 @@ echo "restoring triggers"
 printf "%s\n" "$triggers" | while IFS= read -r trigger_sql; do
  sqlite3 "$output_copy" "$trigger_sql"
 done
-
-#for trigger in "${triggers[@]}"; do
- #sqlite3 "$output_copy" "$trigger"
-#done
-
-
 
 
 echo "removing temp tables and indices"
