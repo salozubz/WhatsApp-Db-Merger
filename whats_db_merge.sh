@@ -190,7 +190,7 @@ function CheckCommonCols() {
    elif [[ "${column_list[i]}" == *"label_id"* ]]; then
     column_list_select[i]="lb${i}.new_id"
     column_list_str+=("join labels_map77 lb${i} on lb${i}.old_id=x.${column_list[i]}")
-   elif [[ "${column_list[i]}" == *"group_participant_row_id"* ]]; then
+   elif [[ "${column_list[i]}" =~ group_participant.*_row_id ]]; then
     column_list_select[i]="gp${i}.new_id"
     column_list_str+=("join group_participant_user_map77 gp${i} on gp${i}.old_id=x.${column_list[i]}")
    else
