@@ -1,29 +1,29 @@
 ##here put the full paths to the databases in quotes. Multiple databases can be merged. As long as they have a recent schema. From 2022 or later
 
-dbs=("path_to_db1" "path_to_db2")
+dbs=("path_to_db_1" "path_to_db_2")
 
 #we need to use the latest database as the schema for the merged database. To get the latest database we have to find the one with the newest timestamp. This method can be overridden by directly assigning the database you desire as the base_db variable
 
-db_time=$(for db in "${dbs[@]}"; do
- t_stamp=$(sqlite3 "$db" "select timestamp from message where _id is not null order by _id desc limit 1;" 2> /dev/null)
- echo "${t_stamp} ${db}"
- if [[ $? != 0 ]]; then
-  echo "Please Check db ${db} as it looks invalid or non-existent"
-  exit 1
- fi
-done | sort -nr)
+db_time=()
 
-base_db=$(printf "%s\n" "${db_time}" | head -n1 | cut -d ' ' -f2-)
+while IFS=$'\n' read -r db; do
+
+ time=$(sqlite3 "$db" "select max(timestamp) from message;" 2>/dev/null)
+  if [[ ! "$time" =~ ^[0-9]+$ ]]; then
+   echo "invalid database encountered, or is non-existent - $db"
+   exit 1
+  else 
+   db_time+=("$time $db")
+  fi
+done < <(printf "%s\n" "${dbs[@]}")
+
+
+base_db=$(printf "%s\n" "${db_time[@]}" | sort -nr | head -n1 | cut -d ' ' -f2-)
 
 dbs=()
-
-#remove base database and get the other databases after removing the timestamps from each line
-
-while IFS= read -r line; do
- ldb=$(echo "$line" | cut -d ' ' -f2-)
- dbs+=("$ldb")
-done < <(printf "%s\n" "${db_time}" | sed '1d')
-
+while IFS=$'\n' read -r line; do
+ dbs+=("$line")
+done < <(printf "%s\n" "${db_time[@]}" | sort -nr | sed '1d' | cut -d ' ' -f2-)
 
 
 echo -e "latest database is ${base_db}\nThis will be used as the Base database."
