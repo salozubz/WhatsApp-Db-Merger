@@ -323,7 +323,7 @@ echo "fixing chats"
 chat_update_string=$(sqlite3 "$db" "select group_concat(name || '= (select maxid from display_ids where display_ids.chatid = chat._id)') from pragma_table_info('chat') where (name like '%message_row_id%' or name like '%message_sort_id%') and name not like '%ephemeral%';")
 
 
-sqlite3 "$output_copy" "with display_ids as (select max(_id) as maxid,chat_row_id as chatid from message where message_type not in (0,7) or (message_type=0 and text_data is not null) group by chat_row_id) update chat set ${chat_update_string} where exists (select 1 from display_ids where display_ids.chatid = chat._id);" "update chat set hidden=case when exists (select 1 from message where chat_row_id = chat._id and message_type != 7) then 0 else 1 end;" "update chat set last_message_reaction_row_id=null,last_seen_message_reaction_row_id=null;" "with timestamps as (select chat_row_id as chat_id, max(timestamp) as latest from message where message_type !=7 group by chat_row_id) update chat set sort_timestamp=(select latest from timestamps where timestamps.chat_id=chat._id) where hidden=0 and exists (select 1 from timestamps where chat._id=timestamps.chat_id);"
+sqlite3 "$output_copy" "with display_ids as (select max(_id) as maxid,chat_row_id as chatid from message where message_type not in (0,7) or (message_type=0 and text_data is not null) group by chat_row_id) update chat set ${chat_update_string} where exists (select 1 from display_ids where display_ids.chatid = chat._id);" "update chat set hidden=case when exists (select 1 from message where chat_row_id = chat._id and message_type != 7) then 0 else 1 end;" "update chat set last_message_reaction_row_id=null,last_seen_message_reaction_row_id=null;" "with timestamps as (select chat_row_id as chat_id, max(timestamp) as latest from message where message_type !=7 group by chat_row_id) update chat set sort_timestamp=(select latest from timestamps where timestamps.chat_id=chat._id) where hidden=0 and exists (select 1 from timestamps where chat._id=timestamps.chat_id);" 2>/dev/null
 
 
 
@@ -335,7 +335,7 @@ sqlite3 "$output_copy" "delete from props where key='fts_index_start';" "update 
 
 
 #duplicates
-sqlite3 "$output_copy" "delete from frequent where _id in (with freq as (select row_number() over (partition by jid_row_id order by message_count desc) as rn, _id, jid_row_id from frequent) select _id from freq where rn > 1);" "delete from frequents where _id in (with freqs as (select row_number() over (partition by jid order by message_count desc) as rn, _id, jid from frequents) select _id from freqs where rn > 1);"
+sqlite3 "$output_copy" "delete from frequent where _id in (with freq as (select row_number() over (partition by jid_row_id order by message_count desc) as rn, _id, jid_row_id from frequent) select _id from freq where rn > 1);" "delete from frequents where _id in (with freqs as (select row_number() over (partition by jid order by message_count desc) as rn, _id, jid from frequents) select _id from freqs where rn > 1);" 2>/dev/null
 
 sqlite3 "$output_copy" "update message set sort_id=_id;"
 
