@@ -254,9 +254,13 @@ function CheckCommonCols() {
 
 # to sort a main table using timestamp add it here 
   case "$2" in message|call_log|message_add_on)
-   sortstr=" order by x.timestamp asc" ;;
+   sortstr=" order by x.timestamp asc"
+   wherestr=" where x.timestamp is not null"
+   ;;
   *)
-   sortstr="" ;;
+   sortstr=""
+   wherestr=""
+   ;;
   esac
  fi   
 }
@@ -264,6 +268,7 @@ function CheckCommonCols() {
 
 count=0
 sortstr=""
+wherestr=""
 for db in "${dbs[@]}"; do
 #### makes the merged output as the entry database and the copy as the base database for sorting
 ((count++))
@@ -293,7 +298,7 @@ fi
    
    CheckCommonCols "$db" "$table"
    if [[ -n "$common_columns" ]]; then
-    sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}${sortstr}" "create table if not exists ${table}_map77 (old_id integer unique, new_id integer unique);" "delete from ${table}_map77;" "insert or ignore into ${table}_map77 (old_id,new_id) ${mapjoin};"
+    sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}${wherestr}${sortstr}" "create table if not exists ${table}_map77 (old_id integer unique, new_id integer unique);" "delete from ${table}_map77;" "insert or ignore into ${table}_map77 (old_id,new_id) ${mapjoin};"
 
    else
     echo -e "no common columns found in table $table on database: $output and database: $db\nThis table will be skipped"
