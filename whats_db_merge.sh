@@ -94,31 +94,31 @@ for table in "${m_tables[@]}"; do
  case $table in
   jid)
    unique="raw_string"
-   ;;
+  ;;
   chat)
    unique="jid_row_id"
-   ;;
+  ;;
   message|message_add_on)
    unique="chat_row_id,from_me,key_id,sender_jid_row_id" 
-   ;;
+  ;;
   call_log)
    unique="call_id,from_me,jid_row_id, transaction_id"
-   ;;
+  ;;
   message_vcard)
    unique="message_row_id,vcard"
-   ;;
+  ;;
   labels)
    unique="label_name"
-   ;;
+  ;;
   quick_replies)
    unique="title"
-   ;;
+  ;;
   group_participant_user)
    unique="group_jid_row_id,user_jid_row_id"
-   ;;
+  ;;
   reporting_info)
    unique="cast(reporting_tag as blob),stanza_id"
-   ;;
+  ;;
  esac
  sqlite3 "$output" "create unique index if not exists ${table}_unique_index_77 on ${table} (${unique})"
 done
@@ -161,12 +161,12 @@ function CheckCommonCols() {
     *jid_row_id*|business_owner_jid|seller_jid|*lid_row_id*)
     column_list_select[i]="case when j${i}.new_id is null then x.${column_list[i]} else j${i}.new_id end"
     column_list_str+=("left join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
-    ;;
+   ;;
 
    *chat_row_id*)
     column_list_select[i]="case when c${i}.new_id is null then x.${column_list[i]} else c${i}.new_id end"
     column_list_str+=("left join chat_map77 c${i} on c${i}.old_id=x.${column_list[i]}")
-    ;;
+   ;;
 
    *message_row_id*|*message_table_id*)
      if [[ "$2" == "chat" ]]; then
@@ -175,77 +175,77 @@ function CheckCommonCols() {
       column_list_select[i]="case when m${i}.new_id is null then x.${column_list[i]} else m${i}.new_id end"
       column_list_str+=("left join message_map77 m${i} on m${i}.old_id=x.${column_list[i]}")
      fi
-    ;;
+   ;;
 
    *call_log_row_id*|*call_logs_row_id*)
     column_list_select[i]="case when cl${i}.new_id is null then x.${column_list[i]} else cl${i}.new_id end"
     column_list_str+=("left join call_log_map77 cl${i} on cl${i}.old_id=x.${column_list[i]}")
-    ;;
+   ;;
 
    *message_add_on_row_id*)
     column_list_select[i]="case when m_add${i}.new_id is null then x.${column_list[i]} else m_add${i}.new_id end"
     column_list_str+=("left join message_add_on_map77 m_add${i} on m_add${i}.old_id=x.${column_list[i]}")
-    ;;
+   ;;
 
    *vcard_row_id*)
     column_list_select[i]="case when vc${i}.new_id is null then x.${column_list[i]} else vc${i}.new_id end"
     column_list_str+=("left join message_vcard_map77 vc${i} on vc${i}.old_id=x.${column_list[i]}")
-    ;;
+   ;;
 
    *quick_reply_id*)
     column_list_select[i]="case when qr${i}.new_id is null then x.${column_list[i]} else qr${i}.new_id end"
     column_list_str+=("left join quick_replies_map77 qr${i} on qr${i}.old_id=x.${column_list[i]}")
-     ;;
+    ;;
 
    *reporting_info_row_id*)
     column_list_select[i]="case when ri${i}.new_id is null then x.${column_list[i]} else ri${i}.new_id end"
     column_list_str+=("left join reporting_info_map77 ri${i} on ri${i}.old_id=x.${column_list[i]}")
-     ;;
+    ;;
 
     *label_id*)
      column_list_select[i]="case when lb${i}.new_id is null then x.${column_list[i]} else lb${i}.new_id end"
      column_list_str+=("left join labels_map77 lb${i} on lb${i}.old_id=x.${column_list[i]}")
-     ;;
+    ;;
 
     group_participant*_row_id)
      column_list_select[i]="case when gp${i}.new_id is null then x.${column_list[i]} else gp${i}.new_id end"
      column_list_str+=("left join group_participant_user_map77 gp${i} on gp${i}.old_id=x.${column_list[i]}")
-     ;;
+    ;;
 
    *)
     column_list_select[i]="x.${column_list[i]}"
-     ;;
+    ;;
    esac
 
     mapjoin=""
     case "$table" in
      chat)
       mapjoin="select dc._id,c._id from chat c join jid j on c.jid_row_id=j._id join db.jid dj on dj.raw_string=j.raw_string join db.chat dc on dc.jid_row_id=dj._id"
-      ;;
+     ;;
      message)
       mapjoin="select dm._id,m._id from message m join db.message dm on m.key_id=dm.key_id and m.from_me=dm.from_me"
-      ;;
+     ;;
      call_log)
       mapjoin="select dc._id,c._id from call_log c join db.call_log dc on c.call_id=dc.call_id"
-      ;;
+     ;;
      message_add_on)
       mapjoin="select dm_add._id,m_add._id from message_add_on m_add join db.message_add_on dm_add on m_add.key_id=dm_add.key_id and m_add.from_me=dm_add.from_me"
-      ;;
+     ;;
      message_vcard)
       mapjoin="select dvc._id,vc._id from db.message_vcard dvc join db.message dm on dm._id=dvc.message_row_id join message m on m.key_id=dm.key_id join message_vcard vc on vc.message_row_id=m._id"
-      ;;
+     ;;
      quick_replies)
       mapjoin="select dqr._id,qr._id from db.quick_replies dqr join quick_replies qr on qr.title=dqr.title"
-      ;;
+     ;;
      labels)
       mapjoin="select dlb._id,lb._id from db.labels dlb join labels lb on lb.label_name=dlb.label_name"
-      ;;
+     ;;
      group_participant_user)
       mapjoin="select dgp._id,gp._id from db.group_participant_user dgp join db.jid dj1 on dj1._id=dgp.group_jid_row_id join db.jid dj2 on dj2._id=dgp.user_jid_row_id join jid j1 on j1.raw_string=dj1.raw_string join jid j2 on j2.raw_string=dj2.raw_string join group_participant_user gp on gp.group_jid_row_id=j1._id and gp.user_jid_row_id=j2._id"
-      ;;
+     ;;
      reporting_info)
       mapjoin="select dri._id,ri._id from db.reporting_info dri join message_map77 m7 on m7.old_id=dri.message_row_id join reporting_info ri on ri.message_row_id=m7.new_id"
-      ;;
+     ;;
     esac
   done
 
@@ -256,11 +256,11 @@ function CheckCommonCols() {
   case "$2" in message|call_log|message_add_on)
    sortstr=" order by x.timestamp asc"
    wherestr=" where x.timestamp is not null"
-   ;;
+  ;;
   *)
    sortstr=""
    wherestr=""
-   ;;
+  ;;
   esac
  fi   
 }
