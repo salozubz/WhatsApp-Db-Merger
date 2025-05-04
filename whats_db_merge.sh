@@ -156,15 +156,16 @@ function CheckCommonCols() {
   column_list_str=()
  
   for ((i=0;i<${#column_list[@]};i++)); do
+   column_list_select[i]=""
 
    case "${column_list[i]}" in
     *jid_row_id*|business_owner_jid|seller_jid|*lid_row_id*)
-    column_list_select[i]="case when j${i}.new_id is null then x.${column_list[i]} else j${i}.new_id end"
+    column_list_select[i]="j${i}.new_id"
     column_list_str+=("left join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
    ;;
 
    *chat_row_id*)
-    column_list_select[i]="case when c${i}.new_id is null then x.${column_list[i]} else c${i}.new_id end"
+    column_list_select[i]="c${i}.new_id end"
     column_list_str+=("left join chat_map77 c${i} on c${i}.old_id=x.${column_list[i]}")
    ;;
 
@@ -172,43 +173,45 @@ function CheckCommonCols() {
      if [[ "$2" == "chat" ]]; then
       column_list_select[i]="x.${column_list[i]}"
      else
-      column_list_select[i]="case when m${i}.new_id is null then x.${column_list[i]} else m${i}.new_id end"
+      column_list_select[i]="m${i}.new_id"
       column_list_str+=("left join message_map77 m${i} on m${i}.old_id=x.${column_list[i]}")
      fi
+
+      
    ;;
 
    *call_log_row_id*|*call_logs_row_id*)
-    column_list_select[i]="case when cl${i}.new_id is null then x.${column_list[i]} else cl${i}.new_id end"
+    column_list_select[i]="cl${i}.new_id end"
     column_list_str+=("left join call_log_map77 cl${i} on cl${i}.old_id=x.${column_list[i]}")
    ;;
 
    *message_add_on_row_id*)
-    column_list_select[i]="case when m_add${i}.new_id is null then x.${column_list[i]} else m_add${i}.new_id end"
+    column_list_select[i]="m_add${i}.new_id"
     column_list_str+=("left join message_add_on_map77 m_add${i} on m_add${i}.old_id=x.${column_list[i]}")
    ;;
 
    *vcard_row_id*)
-    column_list_select[i]="case when vc${i}.new_id is null then x.${column_list[i]} else vc${i}.new_id end"
+    column_list_select[i]="vc${i}.new_id end"
     column_list_str+=("left join message_vcard_map77 vc${i} on vc${i}.old_id=x.${column_list[i]}")
    ;;
 
    *quick_reply_id*)
-    column_list_select[i]="case when qr${i}.new_id is null then x.${column_list[i]} else qr${i}.new_id end"
+    column_list_select[i]="qr${i}.new_id"
     column_list_str+=("left join quick_replies_map77 qr${i} on qr${i}.old_id=x.${column_list[i]}")
     ;;
 
    *reporting_info_row_id*)
-    column_list_select[i]="case when ri${i}.new_id is null then x.${column_list[i]} else ri${i}.new_id end"
+    column_list_select[i]="ri${i}.new_id"
     column_list_str+=("left join reporting_info_map77 ri${i} on ri${i}.old_id=x.${column_list[i]}")
     ;;
 
     *label_id*)
-     column_list_select[i]="case when lb${i}.new_id is null then x.${column_list[i]} else lb${i}.new_id end"
+     column_list_select[i]="lb${i}.new_id"
      column_list_str+=("left join labels_map77 lb${i} on lb${i}.old_id=x.${column_list[i]}")
     ;;
 
     group_participant*_row_id)
-     column_list_select[i]="case when gp${i}.new_id is null then x.${column_list[i]} else gp${i}.new_id end"
+     column_list_select[i]="gp${i}.new_id"
      column_list_str+=("left join group_participant_user_map77 gp${i} on gp${i}.old_id=x.${column_list[i]}")
     ;;
 
@@ -377,6 +380,13 @@ mv "$output_copy" "$output"
 
 #backup_changes
  
+ck=$(sqlite3 "$output" "select name from sqlite_master where type='table' and name='message_ftsv2';" 2>/dev/null)
+
+if [[ -z "$ck" ]]; then
+  echo "Crypt database detected. Performing some minor fixes to make WhatsApp able to restore..."
+  sqlite3 "$output" "delete from props;" "delete from user_device;"
+fi
+
 sqlite3 "$output" "delete from backup_changes;"
 
 echo "Done. output in $output"
