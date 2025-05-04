@@ -334,12 +334,8 @@ chat_update_string=$(sqlite3 "$db" "select group_concat(name || '= (select maxid
 sqlite3 "$output_copy" "with display_ids as (select max(_id) as maxid,chat_row_id as chatid from message where message_type not in (0,7) or (message_type=0 and text_data is not null) group by chat_row_id) update chat set ${chat_update_string} where exists (select 1 from display_ids where display_ids.chatid = chat._id);" "update chat set hidden=case when exists (select 1 from message where chat_row_id = chat._id and message_type != 7) then 0 else 1 end;" "update chat set last_message_reaction_row_id=null,last_seen_message_reaction_row_id=null;" "with timestamps as (select chat_row_id as chat_id, max(timestamp) as latest from message where message_type !=7 group by chat_row_id) update chat set sort_timestamp=(select latest from timestamps where timestamps.chat_id=chat._id) where hidden=0 and exists (select 1 from timestamps where chat._id=timestamps.chat_id);" 2>/dev/null
 
 
-
-
 #fixing props
 sqlite3 "$output_copy" "delete from props where key='fts_index_start';" "update props set value=0 where key='fts_ready';"
-
-
 
 
 #duplicates
@@ -379,13 +375,6 @@ mv "$output_copy" "$output"
 
 
 #backup_changes
- 
-ck=$(sqlite3 "$output" "select name from sqlite_master where type='table' and name='message_ftsv2';" 2>/dev/null)
-
-if [[ -z "$ck" ]]; then
-  echo "Crypt database detected. Performing some minor fixes to make WhatsApp able to restore..."
-  sqlite3 "$output" "delete from props;" "delete from user_device;"
-fi
 
 sqlite3 "$output" "delete from backup_changes;"
 
