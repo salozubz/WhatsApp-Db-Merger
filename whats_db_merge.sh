@@ -69,12 +69,24 @@ sqlite3 "$output" "vacuum;"
 echo "clearing triggers"
 
 #backup triggers
-triggers=$(sqlite3 "$output" "select name, sql from sqlite_master where type='trigger';")
+triggers=$(sqlite3 -separator $'\x1F' "$output" "select name, replace(sql, x'0a', '<NEWLINE>') from sqlite_master where type='trigger';")
+
+
+declare -A triggers_clean
+
+while IFS=$'\x1F' read -r trigger_name trigger_sql; do
+  trigger_sql="${trigger_sql//<NEWLINE>/$'\n'}"
+
+  #escape any characters in the trigger name which may cause issues with array indexing with bash
+  trigger_name="${trigger_name//[^a-zA-Z0-9_]/_}"
+
+  triggers_clean["$trigger_name"]="$trigger_sql"
+done <<< "$triggers"
 
 
 #delete triggers
-printf "%s\n" "$triggers" | while read -r line; do
-  sqlite3 "$output" "drop trigger if exists ${line%|*};" 2>/dev/null
+for trigger_name in "${!triggers_clean[@]}"; do
+  sqlite3 "$output" "drop trigger \"${trigger_name}\";"
 done
 
 echo "clearing tables"
@@ -352,8 +364,8 @@ sqlite3 "$output_copy" "update message set sort_id=_id;"
 echo "restoring triggers"
 #restore triggers
 
-printf "%s\n" "$triggers" | while IFS= read -r trigger; do
- sqlite3 "$output_copy" "${trigger#*|}" 2>/dev/null
+for trigger_name in "${!triggers_clean[@]}"; do
+  sqlite3 "$output_copy" "${triggers_clean[$trigger_name]}"
 done
 
 
