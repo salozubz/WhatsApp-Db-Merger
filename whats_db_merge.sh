@@ -1,4 +1,4 @@
-#/!bin/bash
+#!/usr/bin/env bash
 
 ##here put the full paths to the databases in quotes. Multiple databases can be merged. As long as they have a recent schema. From 2022 or later
 
@@ -6,6 +6,7 @@ dbs=("path_to_db1" "path_to_db2")
 
 
 #we need to use the latest database as the schema for the merged database. To get the latest database we have to find the one with the newest timestamp. This method can be overridden by directly assigning the database you desire as the base_db variable
+#warning: directly assigning the wrong database can result in an output where this database data is duplicated, and not merged with the other
 
 db_time=()
 
@@ -317,7 +318,7 @@ fi
    
    CheckCommonCols "$db" "$table"
    if [[ -n "$common_columns" ]]; then
-    sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}${wherestr}${sortstr}" "create table if not exists ${table}_map77 (old_id integer unique, new_id integer unique);" "delete from ${table}_map77;" "insert or ignore into ${table}_map77 (old_id,new_id) ${mapjoin};"
+    sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}${wherestr}${sortstr};" "create table if not exists ${table}_map77 (old_id integer unique, new_id integer unique);" "delete from ${table}_map77;" "insert or ignore into ${table}_map77 (old_id,new_id) ${mapjoin};"
 
    else
     echo -e "no common columns found in table $table on database: $output and database: $db\nThis table will be skipped"
@@ -330,7 +331,7 @@ fi
   CheckCommonCols "$db" "$table"
   if [[ -n "$common_columns" ]]; then
  
-   sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}"
+   sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str};"
    
    
    else
