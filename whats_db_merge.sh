@@ -160,8 +160,12 @@ function CheckCommonCols() {
 
    case "${column_list[i]}" in
     *jid_row_id*|business_owner_jid|seller_jid|*lid_row_id*)
-    column_list_select[i]="j${i}.new_id"
-    column_list_str+=("left join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
+     if [[ "$2" == "call_log" || "$2" == "missed_call_logs" ]]; then
+      column_list_select[i]="coalesce(j${i}.new_id,0)"
+     else
+      column_list_select[i]="j${i}.new_id"
+     fi
+     column_list_str+=("left join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
    ;;
 
    *chat_row_id*)
