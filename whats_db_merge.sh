@@ -70,7 +70,7 @@ if [[ "$fk" -eq 1 ]]; then
   sqlite3 "$output" "pragma foreign_keys=off;"
 fi
 
-
+echo "clearing trigges"
 #backup triggers
 
 sqlite3 "$output" "select sql || ';' from sqlite_master where type='trigger';" > "$trigger_dump"
@@ -374,6 +374,9 @@ for t in "${map_indices[@]}"; do
  fi
 done
 
+if [[ "$fk" -eq 1 ]]; then
+  sqlite3 "$output" "pragma foreign_keys=on;"
+fi
 
 output="${HOME}/output/msgstore.db"
 
