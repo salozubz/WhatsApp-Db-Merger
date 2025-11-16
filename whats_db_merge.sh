@@ -1,11 +1,16 @@
-#/!bin/bash
+#!/bin/bash
 
 ##here put the full paths to the databases in quotes. Multiple databases can be merged. As long as they have a recent schema. From 2022 or later
 
 dbs=("path_to_db1" "path_to_db2")
 
+if [[ -z "$HOME" ]]; then
+ printf 'Setup HOME directory first;\nOpen .bashrc and add this line:\nexport HOME="path to your home directory"\nAlternatively you can edit the script to setup your HOME directory\n'
+ exit 1
+fi
 
 #we need to use the latest database as the schema for the merged database. To get the latest database we have to find the one with the newest timestamp. This method can be overridden by directly assigning the database you desire as the base_db variable
+#warning: directly assigning the wrong database can result in an output where this database data is duplicated, and not merged with the other
 
 db_time=()
 
@@ -34,22 +39,14 @@ echo -e "latest database is ${base_db}\nThis will be used as the Base database."
 
 #create copy of the latest database. this makes sure the original databases aren't altered and the copy will be the one edited
 
-homeDir77="$HOME"
-
-
-if [[ -n "$HOME" ]]; then
- [[ "$homeDir77" == *"/data/data/com.termux"* ]] && homeDir77="/storage/emulated/0"
-else
- echo "Please setup your Home directory first"
- exit 1
-fi
-
 
 #output directory
 
 
-outputdir="${homeDir77}/output"
-[[ ! -d "$outputdir" ]] && mkdir "$outputdir"
+outputdir="${HOME}/output"
+trigger_dump="${outputdir}/triggers.sql"
+
+mkdir -p "$outputdir"
 output="${outputdir}/msgstore.db"
 
 
@@ -57,29 +54,40 @@ output="${outputdir}/msgstore.db"
 
 find "${outputdir}" -maxdepth 1 -type f \( -name "msgstore.db-wal" -o -name "msgstore.db-shm" -o -name "msgstore_copy.db-wal" -o -name "msgstore_copy.db-shm" \) -delete
 
-
 #Copy of the base database which will be used in the final loop for sorting messages according to timestamp But first we remove triggers after backing them up then empty the table.
 
 output_copy="${output%.*}_copy.db"
 
 echo "vacuum"
+
 cp "$base_db" "$output"
 sqlite3 "$output" "vacuum;"
+fk_n=$(sqlite3 "$output" "pragma foreign_keys;")
 
-echo "clearing triggers"
+# Disable foreign keys if they exists. Currently WhatsApp doesn't enforce foreign keys. This is for future purposes
+
+if [[ "$fk" -eq 1 ]]; then
+  sqlite3 "$output" "pragma foreign_keys=off;"
+fi
+
 
 #backup triggers
-triggers=$(sqlite3 "$output" "select name, sql from sqlite_master where type='trigger';")
+
+sqlite3 "$output" "select sql || ';' from sqlite_master where type='trigger';" > "$trigger_dump"
 
 
 #delete triggers
-printf "%s\n" "$triggers" | while read -r line; do
-  sqlite3 "$output" "drop trigger if exists ${line%|*};" 2>/dev/null
-done
+
+sqlite3 "$output" << EOF
+$(sqlite3 "$output" "select 'drop trigger if exists ' || quote(name) || ';' from sqlite_master where type='trigger';")
+EOF
 
 echo "clearing tables"
-IFS=$'\n' read -rd '' -a base_tables <<< $(sqlite3 "$output" "select name from sqlite_master where type='table' and name not like '%fts%' and name not like '%view%' and name != 'props';")
-base_tables_str=$(sqlite3 "$output" "select group_concat('''' || name || '''') from sqlite_master where type='table' and name not like '%fts%' and name not like '%view%' and name not in ('sqlite_sequence','android_metadata','props');")
+
+IFS=$'\n' read -rd '' -a base_tables < <(sqlite3 "$output" "select name from sqlite_master where type='table' and name not like '%fts%' and name not like '%view%' and name != 'props';")
+
+
+base_tables_str=$(sqlite3 "$output" "select group_concat(quote(name)) from sqlite_master where type='table' and name not like '%fts%' and name not like '%view%' and name not in ('sqlite_sequence','android_metadata','props');")
 
 
 #this script classifies the tables into main and minor tables. Main tables have a primary key _id column that is being referenced by other tables. eg _id from message is being referenced as message_row_id by other tables
@@ -127,7 +135,6 @@ done
 cp "$output" "$output_copy"
 
 
-
 #base database tables and columns
 for table in "${base_tables[@]}"; do
  sqlite3 "$output_copy" "delete from ${table};"
@@ -139,7 +146,7 @@ sqlite3 "$output_copy" "delete from message_ftsv2;" "delete from message_fts;" "
 declare -A base_table_columns
 
 for table in "${base_tables[@]}"; do
- base_table_columns["$table"]=$(sqlite3 "$output" "select group_concat('''' || name || '''') from pragma_table_info('${table}');")
+  base_table_columns["$table"]=$(sqlite3 "$output" "select group_concat(quote(name)) from pragma_table_info('${table}');")
 done
 
 
@@ -147,7 +154,7 @@ done
 dbs+=("$output")
 
 # check common columns
-function CheckCommonCols() {
+CheckCommonCols() {
   
   common_columns=$(sqlite3 "$1" "select group_concat(name) from pragma_table_info('$2') where name in ("${base_table_columns["$2"]}") and (name != '_id' or not exists (select 1 from pragma_table_info('$2') where name = '_id' and cid = 0));")
  if [[ -n "$common_columns" ]]; then 
@@ -160,8 +167,12 @@ function CheckCommonCols() {
 
    case "${column_list[i]}" in
     *jid_row_id*|business_owner_jid|seller_jid|*lid_row_id*)
-    column_list_select[i]="j${i}.new_id"
-    column_list_str+=("left join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
+     if [[ "$2" == "call_log" || "$2" == "missed_call_logs" ]]; then
+      column_list_select[i]="coalesce(j${i}.new_id,0)"
+     else
+      column_list_select[i]="j${i}.new_id"
+     fi
+     column_list_str+=("left join jid_map77 j${i} on j${i}.old_id=x.${column_list[i]}")
    ;;
 
    *chat_row_id*)
@@ -301,7 +312,7 @@ fi
    
    CheckCommonCols "$db" "$table"
    if [[ -n "$common_columns" ]]; then
-    sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}${wherestr}${sortstr}" "create table if not exists ${table}_map77 (old_id integer unique, new_id integer unique);" "delete from ${table}_map77;" "insert or ignore into ${table}_map77 (old_id,new_id) ${mapjoin};"
+    sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}${wherestr}${sortstr};" "create table if not exists ${table}_map77 (old_id integer unique, new_id integer unique);" "delete from ${table}_map77;" "insert or ignore into ${table}_map77 (old_id,new_id) ${mapjoin};"
 
    else
     echo -e "no common columns found in table $table on database: $output and database: $db\nThis table will be skipped"
@@ -314,7 +325,7 @@ fi
   CheckCommonCols "$db" "$table"
   if [[ -n "$common_columns" ]]; then
  
-   sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str}"
+   sqlite3 "$output" "attach '$db' as db;" "insert or ignore into ${table} (${common_columns}) select ${common_columns_str_select} from db.${table} x ${common_columns_str};"
    
    
    else
@@ -344,13 +355,10 @@ sqlite3 "$output_copy" "delete from frequent where _id in (with freq as (select 
 sqlite3 "$output_copy" "update message set sort_id=_id;"
 
 
-
 echo "restoring triggers"
 #restore triggers
 
-printf "%s\n" "$triggers" | while IFS= read -r trigger; do
- sqlite3 "$output_copy" "${trigger#*|}" 2>/dev/null
-done
+sqlite3 "$output_copy" < "$trigger_dump"
 
 
 echo "removing temp tables and indexes"
@@ -366,10 +374,10 @@ for t in "${map_indices[@]}"; do
  fi
 done
 
-output_copy="${homeDir77}/output/msgstore_copy.db"
-output="${homeDir77}/output/msgstore.db"
 
-rm "$output"
+output="${HOME}/output/msgstore.db"
+
+rm -f "$output" "$trigger_dump"
 mv "$output_copy" "$output"
 
 
