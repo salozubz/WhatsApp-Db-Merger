@@ -192,7 +192,7 @@ CheckCommonCols() {
    ;;
 
    *call_log_row_id*|*call_logs_row_id*)
-    column_list_select[i]="cl${i}.new_id end"
+    column_list_select[i]="cl${i}.new_id"
     column_list_str+=("left join call_log_map77 cl${i} on cl${i}.old_id=x.${column_list[i]}")
    ;;
 
@@ -202,7 +202,7 @@ CheckCommonCols() {
    ;;
 
    *vcard_row_id*)
-    column_list_select[i]="vc${i}.new_id end"
+    column_list_select[i]="vc${i}.new_id"
     column_list_str+=("left join message_vcard_map77 vc${i} on vc${i}.old_id=x.${column_list[i]}")
    ;;
 
