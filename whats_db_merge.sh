@@ -62,7 +62,7 @@ echo "vacuum"
 
 cp "$base_db" "$output"
 sqlite3 "$output" "vacuum;"
-fk_n=$(sqlite3 "$output" "pragma foreign_keys;")
+fk=$(sqlite3 "$output" "pragma foreign_keys;")
 
 # Disable foreign keys if they exists. Currently WhatsApp doesn't enforce foreign keys. This is for future purposes
 
