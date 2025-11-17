@@ -292,7 +292,7 @@ if [[ $count == ${#dbs[@]} ]]; then
   output="$output_copy"
   echo "sorting messages"
 elif [[ $count == 1 ]]; then
-  echo "merging $db"
+  echo "merging"
 fi
 
 
