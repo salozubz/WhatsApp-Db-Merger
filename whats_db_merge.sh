@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-# Put full paths to msgstore databases here.
 # All must have a compatible schema (2022+)
 
 dbs=( "$@" )
@@ -14,6 +13,7 @@ base_db=""
 base_tables_str=""
 main_base_tables_str=""
 minor_base_tables_str=""
+must_stop=0
 
 fk=""
 output_dir="${HOME}/output"
@@ -33,6 +33,7 @@ print() {
 }
 
 log() {
+  [[ -e "/proc/self/fd/${fd}" ]] || return
   local date=$(now)
   printf "[%s] %s\n" "$date" "$*" >&"$fd"
 }
@@ -46,6 +47,7 @@ fatal() {
 clear_tmp() {
   rm -f "${trigger_dump:?}" 2>/dev/null
   exec {fd}>&-
+  must_stop=1
  }
  
 trap "clear_tmp" INT TERM EXIT 
@@ -75,6 +77,10 @@ sql_scalar() {
   sqlite3 "$db" <<SQL
   select group_concat(nm, ',') from ($args);
 SQL
+}
+# stops script if interrupted within a tight loop
+int_func() {
+  (( must_stop )) && exit 1
 }
 
 if (($# == 0)); then
@@ -163,6 +169,7 @@ create_unique_indexes() {
   print "Creating unique indexes .."
   local lable
   for table in "${main_base_tables[@]}"; do
+    int_func
     case $table in
       jid)
         unique="raw_string";;
@@ -192,6 +199,7 @@ clear_base_db() {
   print "Clearing base tables .."  
   local table
   for table in "${base_tables[@]}"; do
+    int_func
     sql_exec "$output" "delete from '$table';"
   done
   sql_exec "$output" "delete from message_ftsv2; delete from sqlite_sequence;" 2>&"$fd"
@@ -202,7 +210,8 @@ clear_base_db() {
 get_base_table_columns() {
   print "Getting base table columns .."
   for table in "${base_tables[@]}"; do
-     base_table_columns["$table"]=$(sql_scalar "$output" "select quote(name) as nm from pragma_table_info('${table}')")     
+    int_func
+    base_table_columns["$table"]=$(sql_scalar "$output" "select quote(name) as nm from pragma_table_info('${table}')")     
    done
 }
 
@@ -235,6 +244,7 @@ create_sel_join_str() {
   readarray -d "," -t  arr < <(printf "%s" "$str")
   
   for ((i=0;i<${#arr[@]};i++)); do
+    int_func
     case "${arr[i]}" in
       *jid_row_id*|business_owner_jid|seller_jid|*lid_row_id*)
      if [[ "$table" == "call_log" || "$table" == "missed_call_logs" || "$table" == "message" ]]; then
@@ -438,6 +448,7 @@ merge() {
   log "Begin Copying tables from '$db'"
   log "Copying main tables"
   for table in "${common_main_tables[@]}"; do
+    int_func
     log "$table"
     insert_rows "$db" "$table"
     create_maps "$db" "$table"
@@ -445,6 +456,7 @@ merge() {
   print "Merging minor tables .."
   log "Copying minor tables"
   for table in "${common_minor_tables[@]}"; do
+    int_func
     log "$table"
     insert_rows "$db" "$table"
   done
@@ -459,6 +471,7 @@ finally() {
   fi
   print "Clearing backup_changes table .."
   sql_exec "$output" "delete from backup_changes;"
+
   
   print "Done. Output is '$output'"
   print "Log is '$log_file'"
@@ -467,7 +480,7 @@ finally() {
 prepare
 
 for db in "${merge_dbs[@]}"; do
-    merge "$db"
+  merge "$db"
 done
 
 # Copying all merged tables to a new clean database (copy) for sorting of messages
