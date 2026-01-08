@@ -3,10 +3,7 @@
 # Put full paths to msgstore databases here.
 # All must have a compatible schema (2022+)
 
-dbs=(
-"/storage/emulated/0/msgstore0.db"
-"/storage/emulated/0/msgstore1.db"
-)
+dbs=( "$@" )
 
 del=$'\x1f'
 merge_dbs=()
@@ -80,6 +77,9 @@ sql_scalar() {
 SQL
 }
 
+if (($# == 0)); then
+    fatal "[Usage]: ./whats_db_merge.sh \"path_to_db1\" \"path_to_db2\" \"path_to_db_3\""
+fi
 
 setup_output() {
   [[ -z "$HOME" ]] && fatal "HOME variable is not set. Please set it and try again."
@@ -403,7 +403,7 @@ restore_triggers() {
 }
 
 clear_tmp_tables_triggers() {
-  print "Clearing temp tables and triggers .."
+  print "Clearing temp tables and indexes .."
   local map_indexes t
   
   readarray -d "," -t map_indexes < <(sql_scalar "$output" "select name as nm from sqlite_master where name like '%_map77' or name like '%unique_index_77' and type in ('table','index')")
@@ -433,6 +433,7 @@ merge() {
   readarray -d "," -t common_main_tables < <(printf "%s" "$(get_common_main_tables "$db")")
   
   readarray -d "," -t common_minor_tables < <(printf "%s" "$(get_common_minor_tables "$db")")
+  print "Merging '$db' .."
   print "Merging main tables .."
   log "Begin Copying tables from '$db'"
   log "Copying main tables"
@@ -466,7 +467,6 @@ finally() {
 prepare
 
 for db in "${merge_dbs[@]}"; do
-    print "Merging '$db' .."
     merge "$db"
 done
 
