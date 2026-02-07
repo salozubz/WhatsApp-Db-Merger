@@ -21,6 +21,7 @@ output="${output_dir}/msgstore.db"
 output_copy="${output_dir}/msgstore_copy.db"
 trigger_dump="${output_dir}/triggers.sql"
 log_file="${output_dir}/log.txt"
+mkdir -p "$output_dir"
 : > "$log_file"
 exec {fd}>> "$log_file"
 
@@ -45,7 +46,7 @@ fatal() {
 }
 
 clear_tmp() {
-  rm -f "${trigger_dump:?}" 2>/dev/null
+  rm -f "${trigger_dump:?}" "${output_copy:?}" 2>/dev/null
   exec {fd}>&-
   must_stop=1
  }
@@ -89,7 +90,7 @@ fi
 
 setup_output() {
   [[ -z "$HOME" ]] && fatal "HOME variable is not set. Please set it and try again."
-  mkdir -p "$output_dir"
+
   
   find "${output_dir:?}" -maxdepth 1 -type f \( -name "msgstore.db-wal" -o -name "msgstore.db-shm" -o -name "msgstore_copy.db-wal" -o -name "msgstore_copy.db-shm" \) -delete
   cp "$base_db" "$output"
